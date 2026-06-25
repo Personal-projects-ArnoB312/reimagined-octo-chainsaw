@@ -3,6 +3,8 @@ import { kvGet } from "@/lib/kv";
 import type { FeedCard } from "@/lib/types";
 import { APP_CONFIG } from "@/lib/appConfig";
 
+export const dynamic = "force-dynamic";
+
 const MOCK_FEED: FeedCard[] = [
   {
     id: "1",

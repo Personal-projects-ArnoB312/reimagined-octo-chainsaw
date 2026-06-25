@@ -13,9 +13,21 @@ function getClient() {
   }
 
   if (!clientPromise) {
-    const client = createClient({ url });
+    const client = createClient({
+      url,
+      socket: {
+        connectTimeout: 5_000,
+        reconnectStrategy: false,
+      },
+    });
     client.on("error", (err) => console.error("[redis] Client error", err));
-    clientPromise = client.connect().then(() => client);
+    clientPromise = client.connect().then(
+      () => client,
+      (err) => {
+        clientPromise = null;
+        throw err;
+      }
+    );
   }
 
   return clientPromise;
