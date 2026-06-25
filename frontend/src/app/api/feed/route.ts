@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getKv } from "@/lib/kv";
+import { kvGet } from "@/lib/kv";
 import type { FeedCard } from "@/lib/types";
 import { APP_CONFIG } from "@/lib/appConfig";
 
@@ -62,7 +62,7 @@ const MOCK_FEED: FeedCard[] = [
 
 export async function GET() {
   try {
-    const stored = (await getKv().get(APP_CONFIG.kv.feedKey)) as FeedCard[] | null;
+    const stored = (await kvGet(APP_CONFIG.kv.feedKey)) as FeedCard[] | null;
     if (Array.isArray(stored) && stored.length > 0) {
       return NextResponse.json({ items: stored });
     }

@@ -1,23 +1,33 @@
-import { Redis } from "@upstash/redis";
+import { createClient } from "redis";
 
-let client = null;
+let clientPromise = null;
 
 /**
- * Lazily creates the Redis client so a missing env var only fails the
- * request that actually needs storage, not the build itself.
+ * Lazily creates and connects the Redis client, reusing the same
+ * connection across invocations within the same serverless instance.
  */
-export function getKv() {
-  if (client) return client;
-
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  if (!url || !token) {
-    throw new Error(
-      "Redis is not configured: set KV_REST_API_URL/KV_REST_API_TOKEN (Vercel Redis marketplace integration)"
-    );
+function getClient() {
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    throw new Error("Redis is not configured: set REDIS_URL (Vercel Redis integration)");
   }
 
-  client = new Redis({ url, token });
-  return client;
+  if (!clientPromise) {
+    const client = createClient({ url });
+    client.on("error", (err) => console.error("[redis] Client error", err));
+    clientPromise = client.connect().then(() => client);
+  }
+
+  return clientPromise;
+}
+
+export async function kvGet(key) {
+  const client = await getClient();
+  const raw = await client.get(key);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function kvSet(key, value) {
+  const client = await getClient();
+  await client.set(key, JSON.stringify(value));
 }

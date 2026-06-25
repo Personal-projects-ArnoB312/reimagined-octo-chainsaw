@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getKv } from "@/lib/kv";
+import { kvSet } from "@/lib/kv";
 import { APP_CONFIG } from "@/lib/appConfig";
 import { tavilySearch, buildSkillQueries } from "@/lib/tavily";
 import { summarizeSkillWithClaude } from "@/lib/anthropicClient";
@@ -121,7 +121,7 @@ export async function POST(request) {
 
   if (cards.length > 0) {
     try {
-      await getKv().set(APP_CONFIG.kv.feedKey, cards);
+      await kvSet(APP_CONFIG.kv.feedKey, cards);
     } catch (error) {
       console.error("[research] Failed to write feed to Vercel KV", error);
       return NextResponse.json(
