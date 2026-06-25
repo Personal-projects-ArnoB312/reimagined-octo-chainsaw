@@ -1,10 +1,15 @@
+export type FeedImpact = "high" | "medium" | "low";
+
 export interface FeedCard {
   id: string;
   category: string;
   title: string;
   summary: string;
+  content: string;
   bullets: string[];
   source: string;
+  sourceUrl: string | null;
+  impact: FeedImpact;
   publishedAt: string;
 }
 

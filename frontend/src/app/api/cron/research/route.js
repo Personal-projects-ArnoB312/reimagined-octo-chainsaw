@@ -59,6 +59,7 @@ async function researchSkill(skill, account) {
   const card = await summarizeSkillWithClaude(skill, searchResults, {
     model: APP_CONFIG.anthropic.model,
     maxTokens: APP_CONFIG.anthropic.maxTokens,
+    account,
   });
 
   return {
@@ -66,8 +67,11 @@ async function researchSkill(skill, account) {
     category: skill.category ? `${skill.category} · ${skill.name}` : skill.name,
     title: card.title,
     summary: card.summary,
+    content: card.content,
     bullets: card.bullets,
     source: card.source,
+    sourceUrl: searchResults.find((r) => r.url)?.url ?? null,
+    impact: card.impact,
     publishedAt: new Date().toISOString(),
     accountId: account?.id ?? null,
   };

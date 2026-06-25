@@ -5,24 +5,35 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const SYSTEM_PROMPT =
   "Je bent een professionele research-assistent. Vat de updates over deze skill " +
   "samen in een zakelijke, beknopte toon. Genereer exact 1 heldere kaart per skill " +
-  "in JSON-formaat (met title, summary, 3 bullets, en source). Antwoord uitsluitend " +
-  "met geldige JSON, zonder markdown-codeblok en zonder extra tekst.";
+  "in JSON-formaat (met title, summary, content, 3 bullets, source en impact). " +
+  "Beoordeel 'impact' kritisch: alleen updates die direct relevant zijn voor de " +
+  "dagelijkse workflow van de gebruiker krijgen 'high', algemeen interessante maar " +
+  "niet direct toepasbare updates 'medium', en achtergrondnieuws zonder directe " +
+  "actie 'low'. Antwoord uitsluitend met geldige JSON, zonder markdown-codeblok en " +
+  "zonder extra tekst.";
 
-function buildUserPrompt(skill, searchResults) {
+function buildUserPrompt(skill, searchResults, account) {
   const sourcesBlock = searchResults
     .map((r, i) => `[${i + 1}] ${r.title}\n${r.content}\nURL: ${r.url}`)
     .join("\n\n");
 
+  const accountContext = account?.role
+    ? `Functie van de gebruiker: ${account.role} (gebruik dit om de impact op hun workflow in te schatten)`
+    : null;
+
   return [
     `Skill: ${skill.name}`,
     skill.category ? `Categorie: ${skill.category}` : null,
+    accountContext,
     "",
     "Zoekresultaten:",
     sourcesBlock || "(geen zoekresultaten gevonden)",
     "",
     "Geef je antwoord als JSON-object met exact deze velden:",
-    '{ "title": string, "summary": string, "bullets": [string, string, string], "source": string }',
-    'Het veld "source" moet kort en leesbaar zijn, bv. "Via Tavily Search".',
+    '{ "title": string, "summary": string, "content": string, "bullets": [string, string, string], "source": string, "impact": "high" | "medium" | "low" }',
+    '"summary" is 1-2 zinnen voor in een kaartoverzicht. "content" is een uitgebreidere ' +
+      "tekst van 3-5 zinnen voor wie wil doorlezen. " +
+      '"source" moet kort en leesbaar zijn, bv. "Via Tavily Search".',
   ]
     .filter(Boolean)
     .join("\n");
@@ -40,7 +51,11 @@ function extractJson(rawText) {
  * parsed feed card. Throws if the API call fails or the response isn't
  * valid JSON matching the expected shape.
  */
-export async function summarizeSkillWithClaude(skill, searchResults, { model, maxTokens }) {
+export async function summarizeSkillWithClaude(
+  skill,
+  searchResults,
+  { model, maxTokens, account }
+) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured");
@@ -62,7 +77,7 @@ export async function summarizeSkillWithClaude(skill, searchResults, { model, ma
         model,
         max_tokens: maxTokens,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: buildUserPrompt(skill, searchResults) }],
+        messages: [{ role: "user", content: buildUserPrompt(skill, searchResults, account) }],
       }),
       signal: controller.signal,
     });
@@ -91,10 +106,12 @@ export async function summarizeSkillWithClaude(skill, searchResults, { model, ma
   if (
     typeof parsed.title !== "string" ||
     typeof parsed.summary !== "string" ||
+    typeof parsed.content !== "string" ||
     !Array.isArray(parsed.bullets) ||
     parsed.bullets.length !== 3 ||
     !parsed.bullets.every((b) => typeof b === "string") ||
-    typeof parsed.source !== "string"
+    typeof parsed.source !== "string" ||
+    !["high", "medium", "low"].includes(parsed.impact)
   ) {
     throw new Error("Anthropic response JSON did not match the expected card shape");
   }
@@ -102,7 +119,9 @@ export async function summarizeSkillWithClaude(skill, searchResults, { model, ma
   return {
     title: parsed.title,
     summary: parsed.summary,
+    content: parsed.content,
     bullets: parsed.bullets,
     source: parsed.source,
+    impact: parsed.impact,
   };
 }
